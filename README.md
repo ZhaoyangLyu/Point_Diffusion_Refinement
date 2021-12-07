@@ -2,4 +2,6 @@
 This repo intends to release code for our work: 
 
 
-Zhaoyang Lyu, Zhifeng Kong, Xudong Xu, Liang Pan, Dahua Lin, "A Conditional Point Diffusion-Refinement Paradigm for 3D Point Cloud Completion".
+Zhaoyang Lyu\*, Zhifeng Kong\*, Xudong Xu, Liang Pan, Dahua Lin, "A Conditional Point Diffusion-Refinement Paradigm for 3D Point Cloud Completion".
+
+\* Equal contribution
