@@ -707,7 +707,7 @@ if __name__ == "__main__":
     if num_gpus > 1:
         assert args.group_name != ''
     else:
-        assert args.rank == 0:
+        assert args.rank == 0
     
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
