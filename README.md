@@ -30,14 +30,14 @@ bash setup_env.sh
 All point cloud completion experiments will be run in the folder `pointnet2`.
 ## Preprocess the data
 You may download the original [MVP dataset](https://paul007pl.github.io/projects/VRCNet.html) from [Dropbox](https://www.dropbox.com/sh/la0kwlqx4n2s5e3/AACjoTzt-_vlX6OF9mfSpFMra?dl=0&lst=) or [Google Drive](https://drive.google.com/drive/folders/1ylC-dYFM45KW4K9tPyljBSVyetazCEeH).
-You should put all the .h5 files to the folder `pointnet2/mvp_dataloader/data/mvp_dataset`.
+You should put all the .h5 files to the folder `mvp_dataloader/data/mvp_dataset`.
 
 Then we preprocess the partial point clouds in the dataset.
 We observe that most objects in the MVP dataset have reflection symmetry with respect to the xy plane. Therefore, we mirror the partial input with respect to this plane and concatenate the mirrored points with the original partial input. 
 We subsample this concatenated point cloud from 4096 points to 3072 points by farthest point sampling to obtain a uniform point cloud.
 
-You may process the partial point clouds by yourself using the file  `pointnet2/mvp_dataloader/generate_mirrored_partial.py`, or download our preprocessed partial point clouds from [here](https://drive.google.com/drive/folders/1s5r61PjcMlqpkgObtwrGow210XfunjRV?usp=sharing).
-The downloaded .h5 files should be put to the folder `pointnet2/mvp_dataloader/data/mvp_dataset/mirror_and_concated_partial`.
+You may process the partial point clouds by yourself using the file  `mvp_dataloader/generate_mirrored_partial.py`, or download our preprocessed partial point clouds from [here](https://drive.google.com/drive/folders/1s5r61PjcMlqpkgObtwrGow210XfunjRV?usp=sharing).
+The downloaded .h5 files should be put to the folder `mvp_dataloader/data/mvp_dataset/mirror_and_concated_partial`.
 
 ## Train the Conditional Generation Network (DDPM)
 Run the following command to train a conditional Denoising Diffusion Probabilistic Model (DDPM) that can generated a coarse complete point cloud conditioned on a partial point cloud.
@@ -50,7 +50,8 @@ All the checkpoints, evaluation results, and log files will saved to the folder 
 We train the DDPM for 340 epochs and it takes about 5 days on 8 NVIDIA GEFORCE RTX 2080 Ti GPUs. We provide a pretrained DDPM at [here](https://drive.google.com/file/d/1Kyp32RYxUsVqM-lZ2SlMXJfYCkhQVJUJ/view?usp=sharing). You should put the checkpoint to the folder `exp_mvp_dataset_completion/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/logs/checkpoint`.
 
 ## Use the trained DDPM to generate training data for the Refinement Network.
-After training the conditional generation network (DDPM), we need to use it to generate coarse complete point clouds as training data to train the refinement network.
+After training the conditional generation network (DDPM), we need to use it to generate coarse complete point clouds as training data to train the refinement network. In this section, we generate samples using the full 1000-step DDPM for best performance. 
+See the next section if you want to generate samples using accelerated DDPM.
 ### Generate samples for the test set
 We first generate coarse complete point clouds for the test set using the trained DDPM. Run the following command:
 ```
@@ -84,9 +85,34 @@ python generate_samples_distributed.py --execute --gather_results --remove_origi
 It utilizes previously generated x^100 to generate 10 complete point clouds for each partial point cloud in the training set. We need to specify the location of the previously saved x^100 through the argument `XT_folder`.
 Generated coarse complete point clouds and evaluation results will be saved to the folders `mvp_dataloader/data/mvp_dataset/generated_samples/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/pointnet_ckpt_643499/trial_{1-10}`.
 
+## Generate point clouds by fast sampling
+In the above section, we use the full 1000-step DDPM to generate training data for the refinement network, but it takes lots of time. As mentioned in our paper, we could also generate point clouds using an accelerated DDPM in fewers steps, and then train another refinement network to refine these point clouds.
+We use the acceleration strategy proposed in [FastDPM](https://github.com/FengNiMa/FastDPM_pytorch).
+
+Below we demonstrate how we can use a 50-step DDPM to generate coarse point clouds.
+Run the following command to generate coarse point clouds for the test set:
+```
+python generate_samples_distributed.py --execute --gather_results --remove_original_files --config exp_configs/mvp_configs/config_standard_attention_real_3072_partial_points_rot_90_scale_1.2_translation_0.1.json --ckpt_name pointnet_ckpt_643499.pkl --batch_size 32 --phase test --device_ids '0,1,2,3,4,5,6,7' --fast_sampling --fast_sampling_config '50; var; quadratic; 0.5'
+```
+It takes about 1 hour on 8 NVIDIA GEFORCE RTX 2080 Ti GPUs.
+Samples will be saved to `mvp_dataloader/data/mvp_dataset/generated_samples/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/pointnet_ckpt_643499/fast_sampling/fast_sampling_config_length_50_sampling_method_var_schedule_quadratic_kappa_0.5/test`.
+
+Next we generate coarse point clouds without data augmentation for the training set:
+```
+python generate_samples_distributed.py --execute --gather_results --remove_original_files --config exp_configs/mvp_configs/config_standard_attention_real_3072_partial_points_rot_90_scale_1.2_translation_0.1.json --ckpt_name pointnet_ckpt_643499.pkl --batch_size 32 --phase test_trainset --device_ids '0,1,2,3,4,5,6,7' --fast_sampling --fast_sampling_config '50; var; quadratic; 0.5'
+```
+Samples will be saved to `mvp_dataloader/data/mvp_dataset/generated_samples/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/pointnet_ckpt_643499/fast_sampling/fast_sampling_config_length_50_sampling_method_var_schedule_quadratic_kappa_0.5/train`.
+
+Finally we generate 10 trials coarse point clouds with data augmentation for the training set:
+```
+python generate_samples_distributed.py --execute --gather_results --remove_original_files --config exp_configs/mvp_configs/config_standard_attention_real_3072_partial_points_rot_90_scale_1.2_translation_0.1.json --ckpt_name pointnet_ckpt_643499.pkl --batch_size 32 --phase test_trainset --device_ids '0,1,2,3,4,5,6,7' --fast_sampling --fast_sampling_config '50; var; quadratic; 0.5' --augment_data_during_generation --augmentation_during_generation '1.2; 90; 0.5; 0.1' --num_trials 10 
+```
+Samples will be saved to `mvp_dataloader/data/mvp_dataset/generated_samples/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/pointnet_ckpt_643499/fast_sampling/fast_sampling_config_length_50_sampling_method_var_schedule_quadratic_kappa_0.5/trial_{1-10}`
+
 
 ## Train the Refinement Network
-Now we can train the refinement network using training data generated by the trained DDPM.
+### Refine coarse point clouds generated by the full 1000-step DDPM
+We can train the refinement network using training data generated by the trained DDPM.
 Run 
 ```
 python distributed.py --config exp_configs/mvp_configs/config_refine_standard_attention_10_trials.json
@@ -112,6 +138,13 @@ For example, if you want to refine and upsample the DDPM generated coarse points
 ```
 python distributed.py --config exp_configs/mvp_configs/config_refine_and_upsample_16384_pts_standard_attention_10_trials.json
 ```
+
+### Refine coarse point clouds generated by the accelerated 50-step DDPM
+Run the following command to refine coarse point clouds generated by the accelerated 50-step DDPM:
+```
+python distributed.py --config exp_configs/mvp_configs/config_refine_standard_attention_10_trials_fast_sampling_length_50.json
+```
+All the checkpoints, evaluation results, and log files will saved to the folder `exp_mvp_dataset_completion/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/refine_exp_ckpt_643499_standard_attention_10_trials_fast_sampling_length_50`.
 
 # Acknowledgement
 This repo is inspired by and adapted from [Pointnet2_PyTorch](https://github.com/erikwijmans/Pointnet2_PyTorch).

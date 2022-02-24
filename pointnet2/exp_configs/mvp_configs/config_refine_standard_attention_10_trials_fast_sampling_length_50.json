@@ -1,0 +1,144 @@
+{
+    "diffusion_config": {
+        "T": 1000,
+        "beta_0": 0.0001,
+        "beta_T": 0.02
+    },
+    "pointnet_config": {
+        "model_name": "shape_completion_mirror_rot_90_scale_1.2_translation_0.1",
+        "in_fea_dim": 0,
+        "partial_in_fea_dim": 1,
+        "out_dim": 3,
+        "include_t": false,
+        "t_dim": 128,
+        "model.use_xyz": true,
+        "attach_position_to_input_feature": true,
+        "include_abs_coordinate": true,
+        "include_center_coordinate": true,
+        "record_neighbor_stats": false,
+        "bn_first": false,
+        "bias": true,
+        "res_connect": true,
+
+        "include_class_condition": true,
+        "num_class": 16,
+        "class_condition_dim": 128,
+
+        "bn": true,
+
+        "include_local_feature": true,
+        "include_global_feature": true,
+        "global_feature_remove_last_activation": false,
+        "pnet_global_feature_architecture": "[[4, 128, 256], [512, 1024]]",
+        
+        "attention_setting": {
+            "use_attention_module": true,
+            "attention_bn": true,
+            "transform_grouped_feat_out": true,
+            "last_activation": true,
+            "add_attention_to_FeatureMapper_module": true
+        },
+        "architecture": {
+            "npoint": "[1024, 256, 64, 16]",
+            "radius": "[0.1, 0.2, 0.4, 0.8]",
+            "neighbor_definition": "radius",
+            "nsample": "[32, 32, 32, 32]",
+            "feature_dim": "[32, 64, 128, 256, 512]",
+            "mlp_depth": 3,
+            "decoder_feature_dim": "[128, 128, 256, 256, 512]",
+            "include_grouper": false,
+            "decoder_mlp_depth": 2,
+            "use_knn_FP": true,
+            "K": 8
+        },
+        "condition_net_architecture": {
+            "npoint": "[1024, 256, 64, 16]",
+            "radius": "[0.1, 0.2, 0.4, 0.8]",
+            "neighbor_definition": "radius",
+            "nsample": "[32, 32, 32, 32]",
+            "feature_dim": "[32, 32, 64, 64, 128]",
+            "mlp_depth": 3,
+            "decoder_feature_dim": "[32, 32, 64, 64, 128]",
+            "include_grouper": false,
+            "decoder_mlp_depth": 2,
+            "use_knn_FP": true,
+            "K": 8
+        },
+        "feature_mapper_architecture": {
+            "neighbor_definition": "radius",
+            "encoder_feature_map_dim": "[32, 32, 64, 64]",
+            "encoder_mlp_depth": 2,
+            "encoder_radius": "[0.1, 0.2, 0.4, 0.8]",
+            "encoder_nsample": "[32, 32, 32, 32]",
+            "decoder_feature_map_dim": "[32, 32, 64, 64, 128]",
+            "decoder_mlp_depth": 2,
+            "decoder_radius": "[0.1, 0.2, 0.4, 0.8, 1.6]",
+            "decoder_nsample": "[32, 32, 32, 32, 32]"
+        }
+    },
+    "train_config": {
+        "task": "refine_completion",
+        "dataset": "mvp_dataset",
+        "root_directory": "exp_mvp_dataset_completion",
+        "output_directory": "logs/checkpoint",
+        "tensorboard_directory": "logs/tensorboard",
+        "ckpt_iter": "max",
+        "epochs_per_ckpt": 20,
+        "iters_per_logging": 50,
+        "n_epochs": 100,
+        "eval_start_epoch": 0,
+        "eval_per_ckpt": 1,
+        "learning_rate": 0.0002,
+        "loss_type": "mse",
+        "conditioned_on_cloud": true,
+        "random_shuffle_points": true,
+        "only_save_the_best_model": true,
+        "compute_emd": true,
+        "split_dataset_to_multi_gpus": true
+    },
+    "refine_config":{
+        "exp_name": "ckpt_643499_standard_attention_10_trials_fast_sampling_length_50",
+        "cd_loss_type": "cd_p",
+        "output_scale_factor": 0.001,
+        "epochs_per_ckpt": 10,
+        "eval_per_ckpt": 1,
+        "num_samples_tested": 100000,
+        "randomly_select_generated_samples": true,
+        "decrease_epochs_per_ckpt_for_fine_tuning": true,
+        "cd_loss_thred": 0.00062,
+        "epochs_per_ckpt_fine_tune": 2
+    },
+    "mvp_dataset_config": {
+        "dataset": "mvp_dataset",
+        "data_dir": "./mvp_dataloader/data/mvp_dataset",
+        "npoints": 2048,
+        "novel_input": true,
+        "novel_input_only": false,
+        "scale": 1,
+        "batch_size": 32,
+        "eval_batch_size": 200,
+        "num_workers": 4,
+        "num_samples_tested": 1600,
+        "test_trainset_during_eval": true,
+        "include_generated_samples": true,
+        "generated_sample_path": "generated_samples/T1000_betaT0.02_shape_completion_mirror_rot_90_scale_1.2_translation_0.1/pointnet_ckpt_643499/fast_sampling/fast_sampling_config_length_50_sampling_method_var_schedule_quadratic_kappa_0.5",
+        "augmentation": {
+            "pc_augm_scale": 1.01,
+            "pc_augm_rot": true,
+            "pc_rot_scale": 3.0,
+            "pc_augm_mirror_prob": 0.5,
+            "pc_augm_jitter": false,
+            "translation_magnitude": 0.005,
+            "noise_magnitude_for_generated_samples": 0.01
+        },
+        "use_mirrored_partial_input": true,
+        "number_partial_points": 3072
+    },
+    "gen_config": {
+        "ckpt_path": "logs/checkpoint"
+    },
+    "dist_config": {
+        "dist_backend": "nccl",
+        "CUDA_VISIBLE_DEVICES": "0,1,2,3,4,5,6,7"
+    }
+}
